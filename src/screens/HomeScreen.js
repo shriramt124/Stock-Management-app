@@ -1,9 +1,13 @@
+
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, ImageBackground, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [productGroups, setProductGroups] = useState([]);
@@ -34,161 +38,277 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleLogout = async () => {
-    try {
-      await auth().signOut();
-      navigation.replace('Login');
-    } catch (error) {
-      Alert.alert('Error', error.message);
-    }
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await auth().signOut();
+              navigation.replace('Login');
+            } catch (error) {
+              Alert.alert('Error', error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const renderItem = ({ item }) => (
+  const getGroupIcon = (groupName) => {
+    const name = groupName.toLowerCase();
+    if (name.includes('cook') || name.includes('utensil')) return 'restaurant';
+    if (name.includes('steel') || name.includes('metal')) return 'build';
+    if (name.includes('gift') || name.includes('set')) return 'card-giftcard';
+    if (name.includes('hot') || name.includes('pot')) return 'local-fire-department';
+    return 'category';
+  };
+
+  const renderItem = ({ item, index }) => (
     <TouchableOpacity 
-      style={styles.card}
+      style={[styles.card, { marginLeft: index % 2 === 0 ? 0 : 10 }]}
       onPress={() => navigation.navigate('ProductList', { groupId: item.id, groupName: item.name })}
+      activeOpacity={0.8}
     >
-      <View style={styles.cardContent}>
-        <Icon name="category" size={24} color="#4a80f5" style={styles.cardIcon} />
-        <View>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardSubtitle}>{item.description}</Text>
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        style={styles.cardGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.cardIconContainer}>
+          <Icon name={getGroupIcon(item.name)} size={32} color="#fff" />
         </View>
-      </View>
-      <Icon name="chevron-right" size={24} color="#999" />
+        <Text style={styles.cardTitle}>{item.name}</Text>
+        <Text style={styles.cardSubtitle} numberOfLines={2}>
+          {item.description || 'Product group'}
+        </Text>
+        <View style={styles.cardArrow}>
+          <Icon name="arrow-forward" size={20} color="#fff" />
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Stock Management</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Icon name="logout" size={24} color="#333" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Product Groups</Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => navigation.navigate('ProductGroup')}
-          >
-            <Icon name="add" size={24} color="#fff" />
+    <LinearGradient colors={['#f093fb', '#f5576c']} style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Icon name="inventory-2" size={28} color="#fff" />
+            <Text style={styles.headerTitle}>Stock Manager</Text>
+          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Icon name="power-settings-new" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {productGroups.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Icon name="category" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No product groups found</Text>
-            <Text style={styles.emptySubtext}>Tap the + button to add a new group</Text>
+        <View style={styles.content}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Product Categories</Text>
+            <Text style={styles.sectionSubtitle}>Manage your inventory by category</Text>
           </View>
-        ) : (
-          <FlatList
-            data={productGroups}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-    </SafeAreaView>
+
+          {productGroups.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
+                style={styles.emptyCard}
+              >
+                <Icon name="inventory" size={64} color="#666" />
+                <Text style={styles.emptyText}>No Categories Found</Text>
+                <Text style={styles.emptySubtext}>Start by creating your first product category</Text>
+                <TouchableOpacity 
+                  style={styles.createFirstButton}
+                  onPress={() => navigation.navigate('ProductGroup')}
+                >
+                  <Icon name="add" size={20} color="#fff" />
+                  <Text style={styles.createFirstButtonText}>Create Category</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          ) : (
+            <FlatList
+              data={productGroups}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              columnWrapperStyle={styles.row}
+            />
+          )}
+
+          <TouchableOpacity 
+            style={styles.fabButton}
+            onPress={() => navigation.navigate('ProductGroup')}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#ff9a9e', '#fecfef']}
+              style={styles.fabGradient}
+            >
+              <Icon name="add" size={28} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  safeArea: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(10px)',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    marginLeft: 10,
+  },
+  logoutButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   content: {
     flex: 1,
-    padding: 15,
+    padding: 20,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    textAlign: 'center',
   },
-  addButton: {
-    backgroundColor: '#4a80f5',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sectionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: 5,
   },
   list: {
-    paddingBottom: 20,
+    paddingBottom: 100,
+  },
+  row: {
+    justifyContent: 'space-between',
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 2,
+    width: (width - 50) / 2,
+    marginBottom: 15,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardGradient: {
+    padding: 20,
+    height: 140,
+    justifyContent: 'space-between',
   },
-  cardIcon: {
-    marginRight: 15,
+  cardIconContainer: {
+    alignSelf: 'flex-start',
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    marginTop: 10,
   },
   cardSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 5,
+  },
+  cardArrow: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    padding: 5,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  emptyCard: {
+    padding: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    width: '90%',
+  },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#999',
-    marginTop: 10,
+    color: '#333',
+    marginTop: 15,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 5,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  createFirstButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#667eea',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  createFirstButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  fabButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
