@@ -1,258 +1,281 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { updateProductStock, subscribeToProductById } from '../services/firebaseService';
-import { useAuth } from '../context/AuthContext';
 
 const StockUpdateScreen = ({ route, navigation }) => {
   const { productId, productName } = route.params;
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState('');
-  const [cartons, setCartons] = useState('');
+  const [operation, setOperation] = useState('add'); // 'add' or 'subtract'
   const [reason, setReason] = useState('');
-  const [operation, setOperation] = useState('add');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const { currentUser } = useAuth();
 
   useEffect(() => {
-    navigation.setOptions({
-      title: `Update Stock`,
-      headerStyle: {
-        backgroundColor: operation === 'add' ? '#2ed573' : '#ff4757',
-      },
-      headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
-    });
-    
-    const unsubscribe = subscribeToProductById(productId, (productData) => {
-      setProduct(productData);
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, [productId, operation]);
+    fetchProduct();
+  }, [productId]);
 
-  const handleUpdateStock = async () => {
-    if (!quantity || quantity.trim() === '') {
-      Alert.alert('Error', 'Please enter quantity');
-      return;
-    }
-
-    const quantityValue = parseInt(quantity, 10);
-    if (isNaN(quantityValue) || quantityValue <= 0) {
-      Alert.alert('Error', 'Please enter a valid quantity');
-      return;
-    }
-
-    let cartonsValue = 0;
-    if (cartons && cartons.trim() !== '') {
-      cartonsValue = parseInt(cartons, 10);
-      if (isNaN(cartonsValue)) {
-        Alert.alert('Error', 'Please enter a valid number of cartons');
-        return;
+  const fetchProduct = async () => {
+    try {
+      const productDoc = await firestore().collection('products').doc(productId).get();
+      if (productDoc.exists) {
+        setProduct({ id: productDoc.id, ...productDoc.data() });
+      } else {
+        Alert.alert('Error', 'Product not found');
+        navigation.goBack();
       }
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      Alert.alert('Error', 'Failed to load product details');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (operation === 'remove' && quantityValue > product.stock) {
-      Alert.alert('Error', 'Not enough stock available');
+  const handleStockUpdate = async () => {
+    if (!quantity || isNaN(parseInt(quantity))) {
+      Alert.alert('Validation Error', 'Please enter a valid quantity');
       return;
     }
 
-    if (operation === 'remove' && cartonsValue > (product.cartons || 0)) {
-      Alert.alert('Error', 'Not enough cartons available');
+    const updateQuantity = parseInt(quantity);
+    const newStock = operation === 'add' 
+      ? product.stock + updateQuantity 
+      : product.stock - updateQuantity;
+
+    if (newStock < 0) {
+      Alert.alert('Invalid Operation', 'Stock cannot be negative');
       return;
     }
 
     setUpdating(true);
     try {
-      const newStock = operation === 'add' 
-        ? product.stock + quantityValue 
-        : product.stock - quantityValue;
-      
-      const newCartons = operation === 'add' 
-        ? (product.cartons || 0) + cartonsValue 
-        : (product.cartons || 0) - cartonsValue;
-      
-      const changeReason = reason.trim() || 
-        `${operation === 'add' ? 'Added' : 'Removed'} ${quantityValue} units${cartonsValue > 0 ? ` and ${cartonsValue} cartons` : ''}`;
-      
-      const result = await updateProductStock(
-        productId, 
-        newStock, 
-        newCartons, 
-        currentUser.uid,
-        changeReason
-      );
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update stock');
-      }
-      
-      Alert.alert(
-        'Success', 
-        `Stock ${operation === 'add' ? 'added' : 'removed'} successfully`, 
-        [{
+      await firestore().collection('products').doc(productId).update({
+        stock: newStock,
+        lastUpdated: new Date().toISOString(),
+      });
+
+      // Add to stock history
+      await firestore().collection('stockHistory').add({
+        productId,
+        productName: product.name,
+        operation,
+        quantity: updateQuantity,
+        previousStock: product.stock,
+        newStock,
+        reason: reason.trim() || `Stock ${operation === 'add' ? 'added' : 'removed'}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      Alert.alert('Success', 'Stock updated successfully!', [
+        {
           text: 'OK',
           onPress: () => navigation.goBack(),
-        }]
-      );
+        },
+      ]);
     } catch (error) {
       console.error('Error updating stock:', error);
-      Alert.alert('Error', 'Failed to update stock');
+      Alert.alert('Error', 'Failed to update stock. Please try again.');
     } finally {
       setUpdating(false);
     }
   };
 
+  const getOperationColor = () => {
+    return operation === 'add' ? ['#10B981', '#059669'] : ['#EF4444', '#DC2626'];
+  };
+
+  const getOperationIcon = () => {
+    return operation === 'add' ? 'add-circle' : 'remove-circle';
+  };
+
   if (loading) {
     return (
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-        <Text style={styles.loadingText}>Loading product...</Text>
-      </LinearGradient>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Loading product details...</Text>
+      </View>
     );
   }
 
   return (
-    <LinearGradient 
-      colors={operation === 'add' ? ['#2ed573', '#17c0eb'] : ['#ff4757', '#ff3838']} 
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.productName}>{product.name}</Text>
-            <Text style={styles.headerSubtitle}>Update your inventory</Text>
+        
+        {/* Professional Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#2E3A59" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Update Stock</Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{product?.name}</Text>
           </View>
+          <View style={styles.headerSpacer} />
+        </View>
 
-          <View style={styles.formContainer}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)']}
-              style={styles.currentStockCard}
-            >
-              <View style={styles.stockRow}>
-                <View style={styles.stockItem}>
-                  <Icon name="inventory-2" size={24} color="#667eea" />
-                  <View style={styles.stockDetails}>
-                    <Text style={styles.stockLabel}>Current Stock</Text>
-                    <Text style={styles.stockValue}>{product.stock} {product.unit}</Text>
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            
+            {/* Current Stock Card */}
+            <View style={styles.currentStockCard}>
+              <LinearGradient
+                colors={['#4F46E5', '#7C3AED']}
+                style={styles.currentStockGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <View style={styles.currentStockContent}>
+                  <Icon name="inventory-2" size={32} color="#fff" />
+                  <View style={styles.currentStockInfo}>
+                    <Text style={styles.currentStockLabel}>Current Stock</Text>
+                    <Text style={styles.currentStockValue}>
+                      {product?.stock} {product?.unit}
+                    </Text>
                   </View>
                 </View>
-                <View style={styles.stockItem}>
-                  <Icon name="inbox" size={24} color="#667eea" />
-                  <View style={styles.stockDetails}>
-                    <Text style={styles.stockLabel}>Cartons</Text>
-                    <Text style={styles.stockValue}>{product.cartons || 0}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Operation Selection */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Operation Type</Text>
+              <View style={styles.operationButtons}>
+                <TouchableOpacity 
+                  style={[
+                    styles.operationButton,
+                    operation === 'add' && styles.operationButtonSelected
+                  ]}
+                  onPress={() => setOperation('add')}
+                >
+                  <Icon 
+                    name="add-circle" 
+                    size={24} 
+                    color={operation === 'add' ? '#fff' : '#10B981'} 
+                  />
+                  <Text style={[
+                    styles.operationButtonText,
+                    operation === 'add' && styles.operationButtonTextSelected
+                  ]}>
+                    Add Stock
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.operationButton,
+                    operation === 'subtract' && styles.operationButtonSelected
+                  ]}
+                  onPress={() => setOperation('subtract')}
+                >
+                  <Icon 
+                    name="remove-circle" 
+                    size={24} 
+                    color={operation === 'subtract' ? '#fff' : '#EF4444'} 
+                  />
+                  <Text style={[
+                    styles.operationButtonText,
+                    operation === 'subtract' && styles.operationButtonTextSelected
+                  ]}>
+                    Remove Stock
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Quantity Input */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quantity</Text>
+              <View style={styles.inputContainer}>
+                <Icon name={getOperationIcon()} size={20} color="#8E92BC" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter quantity"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="numeric"
+                  placeholderTextColor="#B0B3C1"
+                />
+                <Text style={styles.unitText}>{product?.unit}</Text>
+              </View>
+            </View>
+
+            {/* Reason Input */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Reason (Optional)</Text>
+              <View style={[styles.inputContainer, styles.reasonInputContainer]}>
+                <TextInput
+                  style={[styles.input, styles.reasonInput]}
+                  placeholder="Enter reason for stock update..."
+                  value={reason}
+                  onChangeText={setReason}
+                  multiline
+                  numberOfLines={3}
+                  placeholderTextColor="#B0B3C1"
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* Preview Card */}
+            {quantity && !isNaN(parseInt(quantity)) && (
+              <View style={styles.previewCard}>
+                <View style={styles.previewHeader}>
+                  <Icon name="preview" size={20} color="#2E3A59" />
+                  <Text style={styles.previewTitle}>Preview Changes</Text>
+                </View>
+                <View style={styles.previewContent}>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>Current Stock:</Text>
+                    <Text style={styles.previewValue}>{product?.stock} {product?.unit}</Text>
+                  </View>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>
+                      {operation === 'add' ? 'Adding:' : 'Removing:'}
+                    </Text>
+                    <Text style={[
+                      styles.previewValue,
+                      { color: operation === 'add' ? '#10B981' : '#EF4444' }
+                    ]}>
+                      {operation === 'add' ? '+' : '-'}{quantity} {product?.unit}
+                    </Text>
+                  </View>
+                  <View style={[styles.previewRow, styles.previewRowFinal]}>
+                    <Text style={styles.previewLabelFinal}>New Stock:</Text>
+                    <Text style={styles.previewValueFinal}>
+                      {operation === 'add' 
+                        ? product?.stock + parseInt(quantity) 
+                        : product?.stock - parseInt(quantity)
+                      } {product?.unit}
+                    </Text>
                   </View>
                 </View>
               </View>
-            </LinearGradient>
-            
-            <View style={styles.operationToggle}>
-              <TouchableOpacity 
-                style={[styles.toggleButton, operation === 'add' && styles.toggleButtonActive]}
-                onPress={() => setOperation('add')}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={operation === 'add' ? ['#2ed573', '#17c0eb'] : ['transparent', 'transparent']}
-                  style={styles.toggleGradient}
-                >
-                  <Icon name="add" size={20} color={operation === 'add' ? '#fff' : '#666'} />
-                  <Text style={[styles.toggleText, operation === 'add' && styles.toggleTextActive]}>
-                    Add Stock
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.toggleButton, operation === 'remove' && styles.toggleButtonActive]}
-                onPress={() => setOperation('remove')}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={operation === 'remove' ? ['#ff4757', '#ff3838'] : ['transparent', 'transparent']}
-                  style={styles.toggleGradient}
-                >
-                  <Icon name="remove" size={20} color={operation === 'remove' ? '#fff' : '#666'} />
-                  <Text style={[styles.toggleText, operation === 'remove' && styles.toggleTextActive]}>
-                    Remove Stock
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="inventory-2" size={16} color="#333" /> Quantity ({product.unit})
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder={`Enter quantity in ${product.unit}`}
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="inbox" size={16} color="#333" /> Cartons (Optional)
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter number of cartons"
-                value={cartons}
-                onChangeText={setCartons}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="note" size={16} color="#333" /> Reason (Optional)
-              </Text>
-              <TextInput
-                style={[styles.input, styles.reasonInput]}
-                placeholder="Reason for stock change"
-                value={reason}
-                onChangeText={setReason}
-                multiline
-                numberOfLines={3}
-                placeholderTextColor="#999"
-              />
-            </View>
-            
+            )}
+
+            {/* Update Button */}
             <TouchableOpacity 
-              style={styles.updateButton}
-              onPress={handleUpdateStock}
+              style={[styles.updateButton, updating && styles.updateButtonDisabled]}
+              onPress={handleStockUpdate}
               disabled={updating}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={operation === 'add' ? ['#2ed573', '#17c0eb'] : ['#ff4757', '#ff3838']}
+                colors={updating ? ['#B0B3C1', '#B0B3C1'] : getOperationColor()}
                 style={styles.updateButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
                 {updating ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Icon 
-                      name={operation === 'add' ? 'add' : 'remove'} 
-                      size={24} 
-                      color="#fff" 
-                    />
-                    <Text style={styles.updateButtonText}>
-                      {operation === 'add' ? 'Add to Stock' : 'Remove from Stock'}
-                    </Text>
+                    <Icon name="update" size={20} color="#fff" />
+                    <Text style={styles.updateButtonText}>Update Stock</Text>
                   </>
                 )}
               </LinearGradient>
@@ -260,13 +283,14 @@ const StockUpdateScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   safeArea: {
     flex: 1,
@@ -275,130 +299,229 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
+    marginTop: 16,
+    fontSize: 14,
+    color: '#8E92BC',
   },
   header: {
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
-  productName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  headerContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2E3A59',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
+    color: '#8E92BC',
+    marginTop: 2,
   },
-  formContainer: {
+  headerSpacer: {
+    width: 40,
+  },
+  scrollContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+  },
+  content: {
     padding: 20,
-    marginTop: 20,
+    paddingBottom: 40,
   },
   currentStockCard: {
     borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+    elevation: 3,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  currentStockGradient: {
     padding: 20,
-    marginBottom: 25,
   },
-  stockRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  stockItem: {
+  currentStockContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  stockDetails: {
-    marginLeft: 10,
+  currentStockInfo: {
+    marginLeft: 16,
   },
-  stockLabel: {
-    fontSize: 12,
-    color: '#666',
+  currentStockLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
   },
-  stockValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+  currentStockValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 4,
   },
-  operationToggle: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginBottom: 12,
+  },
+  operationButtons: {
     flexDirection: 'row',
-    marginBottom: 25,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#e9ecef',
+    gap: 12,
   },
-  toggleButton: {
+  operationButton: {
     flex: 1,
-  },
-  toggleGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
   },
-  toggleText: {
+  operationButtonSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#4F46E5',
+  },
+  operationButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8E92BC',
     marginLeft: 8,
-    fontWeight: 'bold',
-    color: '#666',
   },
-  toggleTextActive: {
+  operationButtonTextSelected: {
     color: '#fff',
   },
   inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    color: '#333',
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    minHeight: 52,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
     fontSize: 16,
+    color: '#2E3A59',
+    paddingVertical: 0,
+  },
+  unitText: {
+    fontSize: 14,
+    color: '#8E92BC',
+    fontWeight: '500',
+  },
+  reasonInputContainer: {
+    alignItems: 'flex-start',
+    paddingVertical: 16,
   },
   reasonInput: {
     height: 80,
     textAlignVertical: 'top',
   },
-  updateButton: {
-    marginTop: 20,
+  previewCard: {
+    backgroundColor: '#fff',
     borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  previewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginLeft: 8,
+  },
+  previewContent: {
+    gap: 12,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewRowFinal: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  previewLabel: {
+    fontSize: 14,
+    color: '#8E92BC',
+  },
+  previewValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2E3A59',
+  },
+  previewLabelFinal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E3A59',
+  },
+  previewValueFinal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  updateButton: {
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginTop: 20,
+    elevation: 2,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 8,
+  },
+  updateButtonDisabled: {
+    elevation: 0,
+    shadowOpacity: 0,
   },
   updateButtonGradient: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 18,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   updateButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

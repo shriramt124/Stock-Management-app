@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Image, PermissionsAndroid, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 const AddProductScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -15,26 +16,71 @@ const AddProductScreen = ({ route, navigation }) => {
   const [cartons, setCartons] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const requestStoragePermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          {
+            title: 'Storage Permission Required',
+            message: 'This app needs access to your storage to select images',
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleImagePicker = async () => {
+    const hasPermission = await requestStoragePermission();
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Cannot access gallery without permission');
+      return;
+    }
+
+    const options = {
+      mediaType: 'photo',
+      includeBase64: false,
+      maxHeight: 2000,
+      maxWidth: 2000,
+    };
+
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel || response.error) {
+        return;
+      }
+
+      if (response.assets && response.assets[0]) {
+        setSelectedImage(response.assets[0]);
+      }
+    });
+  };
 
   const handleAddProduct = async () => {
     if (name.trim() === '') {
-      Alert.alert('Error', 'Please enter a product name');
+      Alert.alert('Validation Error', 'Please enter a product name');
       return;
     }
 
     if (mrp.trim() === '') {
-      Alert.alert('Error', 'Please enter product MRP');
+      Alert.alert('Validation Error', 'Please enter product MRP');
       return;
     }
 
     if (stock.trim() === '') {
-      Alert.alert('Error', 'Please enter initial stock');
+      Alert.alert('Validation Error', 'Please enter initial stock');
       return;
     }
 
     setLoading(true);
     try {
-      await firestore().collection('products').add({
+      const productData = {
         groupId,
         name: name.trim(),
         mrp: parseFloat(mrp),
@@ -42,11 +88,14 @@ const AddProductScreen = ({ route, navigation }) => {
         unit: unit.trim(),
         cartons: cartons.trim() ? parseInt(cartons, 10) : 0,
         description: description.trim(),
+        imageUri: selectedImage?.uri || null,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-      });
+      };
+
+      await firestore().collection('products').add(productData);
       
-      Alert.alert('Success', 'Product added successfully', [
+      Alert.alert('Success', 'Product added successfully!', [
         {
           text: 'OK',
           onPress: () => navigation.goBack(),
@@ -54,7 +103,7 @@ const AddProductScreen = ({ route, navigation }) => {
       ]);
     } catch (error) {
       console.error('Error adding product:', error);
-      Alert.alert('Error', 'Failed to add product');
+      Alert.alert('Error', 'Failed to add product. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -63,82 +112,108 @@ const AddProductScreen = ({ route, navigation }) => {
   const unitOptions = ['pcs', 'kg', 'grams', 'liters', 'ml', 'boxes', 'sets'];
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        {/* Professional Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Add New Product</Text>
-          <Text style={styles.headerSubtitle}>to {groupName}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#2E3A59" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Add New Product</Text>
+            <Text style={styles.headerSubtitle}>{groupName}</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={styles.content}>
-          <View style={styles.formContainer}>
-            <View style={styles.imageContainer}>
-              <View style={styles.imagePlaceholder}>
-                <Icon name="add-a-photo" size={32} color="#666" />
-                <Text style={styles.imagePlaceholderText}>Add Product Image</Text>
-              </View>
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            
+            {/* Image Selection Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Product Image</Text>
+              <TouchableOpacity style={styles.imageUploadArea} onPress={handleImagePicker}>
+                {selectedImage ? (
+                  <View style={styles.selectedImageContainer}>
+                    <Image source={{ uri: selectedImage.uri }} style={styles.selectedImage} />
+                    <View style={styles.imageOverlay}>
+                      <Icon name="edit" size={20} color="#fff" />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.uploadPlaceholder}>
+                    <Icon name="add-photo-alternate" size={32} color="#8E92BC" />
+                    <Text style={styles.uploadText}>Tap to add product image</Text>
+                    <Text style={styles.uploadSubtext}>JPG, PNG supported</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="inventory" size={16} color="#333" /> Product Name
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter product name (e.g., Steel Bottle)"
-                value={name}
-                onChangeText={setName}
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="currency-rupee" size={16} color="#333" /> MRP (₹)
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter maximum retail price"
-                value={mrp}
-                onChangeText={setMrp}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.rowContainer}>
-              <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                <Text style={styles.label}>
-                  <Icon name="inventory-2" size={16} color="#333" /> Initial Stock
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Quantity"
-                  value={stock}
-                  onChangeText={setStock}
-                  keyboardType="numeric"
-                  placeholderTextColor="#999"
-                />
-              </View>
+            {/* Product Information Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Product Information</Text>
               
-              <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-                <Text style={styles.label}>
-                  <Icon name="straighten" size={16} color="#333" /> Unit
-                </Text>
-                <View style={styles.unitSelector}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Product Name *</Text>
+                <View style={styles.inputContainer}>
+                  <Icon name="inventory" size={20} color="#8E92BC" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter product name"
+                    value={name}
+                    onChangeText={setName}
+                    placeholderTextColor="#B0B3C1"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>MRP (₹) *</Text>
+                <View style={styles.inputContainer}>
+                  <Icon name="currency-rupee" size={20} color="#8E92BC" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="0.00"
+                    value={mrp}
+                    onChangeText={setMrp}
+                    keyboardType="numeric"
+                    placeholderTextColor="#B0B3C1"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+                  <Text style={styles.inputLabel}>Stock Quantity *</Text>
+                  <View style={styles.inputContainer}>
+                    <Icon name="inventory-2" size={20} color="#8E92BC" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0"
+                      value={stock}
+                      onChangeText={setStock}
+                      keyboardType="numeric"
+                      placeholderTextColor="#B0B3C1"
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
+                  <Text style={styles.inputLabel}>Unit</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitContainer}>
                     {unitOptions.map((unitOption) => (
                       <TouchableOpacity
                         key={unitOption}
                         style={[
-                          styles.unitOption,
-                          unit === unitOption && styles.unitOptionSelected
+                          styles.unitButton,
+                          unit === unitOption && styles.unitButtonSelected
                         ]}
                         onPress={() => setUnit(unitOption)}
                       >
                         <Text style={[
-                          styles.unitOptionText,
-                          unit === unitOption && styles.unitOptionTextSelected
+                          styles.unitButtonText,
+                          unit === unitOption && styles.unitButtonTextSelected
                         ]}>
                           {unitOption}
                         </Text>
@@ -147,53 +222,58 @@ const AddProductScreen = ({ route, navigation }) => {
                   </ScrollView>
                 </View>
               </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Cartons (Optional)</Text>
+                <View style={styles.inputContainer}>
+                  <Icon name="inbox" size={20} color="#8E92BC" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="0"
+                    value={cartons}
+                    onChangeText={setCartons}
+                    keyboardType="numeric"
+                    placeholderTextColor="#B0B3C1"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description (Optional)</Text>
+                <View style={[styles.inputContainer, styles.textAreaContainer]}>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Enter product description..."
+                    value={description}
+                    onChangeText={setDescription}
+                    multiline
+                    numberOfLines={4}
+                    placeholderTextColor="#B0B3C1"
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
             </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="inbox" size={16} color="#333" /> Cartons (Optional)
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter number of cartons"
-                value={cartons}
-                onChangeText={setCartons}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                <Icon name="description" size={16} color="#333" /> Description (Optional)
-              </Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Enter product description"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={4}
-                placeholderTextColor="#999"
-              />
-            </View>
-            
+
+            {/* Action Button */}
             <TouchableOpacity 
-              style={styles.addButton}
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
               onPress={handleAddProduct}
               disabled={loading}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#2ed573', '#17c0eb']}
-                style={styles.addButtonGradient}
+                colors={loading ? ['#B0B3C1', '#B0B3C1'] : ['#4F46E5', '#7C3AED']}
+                style={styles.submitButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Icon name="add" size={24} color="#fff" />
-                    <Text style={styles.addButtonText}>Add Product</Text>
+                    <Icon name="add" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>Add Product</Text>
                   </>
                 )}
               </LinearGradient>
@@ -201,131 +281,196 @@ const AddProductScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   safeArea: {
     flex: 1,
   },
   header: {
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  headerContent: {
+    flex: 1,
+    marginLeft: 16,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2E3A59',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
+    color: '#8E92BC',
+    marginTop: 2,
   },
-  content: {
+  headerSpacer: {
+    width: 40,
+  },
+  scrollContainer: {
     flex: 1,
   },
-  formContainer: {
-    backgroundColor: '#f8f9fa',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+  content: {
     padding: 20,
-    minHeight: '100%',
+    paddingBottom: 40,
   },
-  imageContainer: {
-    alignItems: 'center',
-    marginBottom: 25,
+  section: {
+    marginBottom: 32,
   },
-  imagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#e9ecef',
-    justifyContent: 'center',
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginBottom: 16,
+  },
+  imageUploadArea: {
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#dee2e6',
+    borderColor: '#E2E8F0',
     borderStyle: 'dashed',
+    backgroundColor: '#fff',
+    overflow: 'hidden',
   },
-  imagePlaceholderText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 8,
+  selectedImageContainer: {
+    position: 'relative',
+    height: 200,
   },
-  inputContainer: {
+  selectedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  uploadPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  uploadText: {
+    fontSize: 16,
+    color: '#2E3A59',
+    fontWeight: '500',
+    marginTop: 12,
+  },
+  uploadSubtext: {
+    fontSize: 14,
+    color: '#8E92BC',
+    marginTop: 4,
+  },
+  inputGroup: {
     marginBottom: 20,
   },
-  rowContainer: {
-    flexDirection: 'row',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    color: '#333',
-    fontSize: 16,
-  },
-  unitSelector: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    padding: 5,
-  },
-  unitOption: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginHorizontal: 2,
-  },
-  unitOptionSelected: {
-    backgroundColor: '#667eea',
-  },
-  unitOptionText: {
-    color: '#666',
+  inputLabel: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#2E3A59',
+    marginBottom: 8,
   },
-  unitOptionTextSelected: {
-    color: '#fff',
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    minHeight: 52,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2E3A59',
+    paddingVertical: 0,
+  },
+  textAreaContainer: {
+    alignItems: 'flex-start',
+    paddingVertical: 16,
   },
   textArea: {
-    height: 100,
+    height: 80,
     textAlignVertical: 'top',
   },
-  addButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  addButtonGradient: {
+  row: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 18,
   },
-  addButtonText: {
+  unitContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 4,
+    marginTop: 8,
+  },
+  unitButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  unitButtonSelected: {
+    backgroundColor: '#4F46E5',
+  },
+  unitButtonText: {
+    fontSize: 14,
+    color: '#8E92BC',
+    fontWeight: '500',
+  },
+  unitButtonTextSelected: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginLeft: 10,
+  },
+  submitButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 20,
+    elevation: 2,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  submitButtonDisabled: {
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  submitButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

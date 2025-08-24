@@ -13,17 +13,6 @@ const ProductListScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    navigation.setOptions({
-      title: groupName,
-      headerStyle: {
-        backgroundColor: '#667eea',
-      },
-      headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
-    });
-    
     const unsubscribe = subscribeToProducts(groupId, (productList) => {
       setProducts(productList);
       setLoading(false);
@@ -33,9 +22,9 @@ const ProductListScreen = ({ route, navigation }) => {
   }, [groupId]);
 
   const getStockStatus = (stock) => {
-    if (stock === 0) return { color: '#ff4757', text: 'Out of Stock', icon: 'error' };
-    if (stock < 10) return { color: '#ffa502', text: 'Low Stock', icon: 'warning' };
-    return { color: '#2ed573', text: 'In Stock', icon: 'check-circle' };
+    if (stock === 0) return { color: '#EF4444', text: 'Out of Stock', icon: 'error', bgColor: '#FEF2F2' };
+    if (stock < 10) return { color: '#F59E0B', text: 'Low Stock', icon: 'warning', bgColor: '#FFFBEB' };
+    return { color: '#10B981', text: 'In Stock', icon: 'check-circle', bgColor: '#ECFDF5' };
   };
 
   const getProductImage = (productName) => {
@@ -52,25 +41,27 @@ const ProductListScreen = ({ route, navigation }) => {
 
     return (
       <TouchableOpacity 
-        style={styles.card}
+        style={styles.productCard}
         onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
         activeOpacity={0.9}
       >
-        <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          style={styles.cardContent}
-        >
-          <View style={styles.cardHeader}>
+        <View style={styles.productCardContent}>
+          
+          {/* Product Image and Status */}
+          <View style={styles.productHeader}>
             <View style={styles.productImageContainer}>
-              {productImage ? (
+              {item.imageUri ? (
+                <Image source={{ uri: item.imageUri }} style={styles.productImage} />
+              ) : productImage ? (
                 <Image source={productImage} style={styles.productImage} />
               ) : (
                 <View style={styles.productIconContainer}>
-                  <Icon name="inventory" size={32} color="#667eea" />
+                  <Icon name="inventory" size={24} color="#8E92BC" />
                 </View>
               )}
             </View>
-            <View style={styles.stockBadge}>
+            
+            <View style={[styles.stockBadge, { backgroundColor: stockStatus.bgColor }]}>
               <Icon name={stockStatus.icon} size={12} color={stockStatus.color} />
               <Text style={[styles.stockBadgeText, { color: stockStatus.color }]}>
                 {stockStatus.text}
@@ -78,175 +69,210 @@ const ProductListScreen = ({ route, navigation }) => {
             </View>
           </View>
 
+          {/* Product Information */}
           <View style={styles.productInfo}>
-            <Text style={styles.productName}>{item.name}</Text>
-            <Text style={styles.productMrp}>₹{item.mrp}</Text>
+            <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+            <Text style={styles.productPrice}>₹{item.mrp.toLocaleString()}</Text>
             
-            <View style={styles.stockDetails}>
-              <View style={styles.stockItem}>
-                <Icon name="inventory-2" size={16} color="#666" />
-                <Text style={styles.stockText}>{item.stock} {item.unit}</Text>
+            <View style={styles.productDetails}>
+              <View style={styles.detailItem}>
+                <Icon name="inventory-2" size={14} color="#8E92BC" />
+                <Text style={styles.detailText}>{item.stock} {item.unit}</Text>
               </View>
-              <View style={styles.stockItem}>
-                <Icon name="inbox" size={16} color="#666" />
-                <Text style={styles.stockText}>{item.cartons || 0} cartons</Text>
+              <View style={styles.detailItem}>
+                <Icon name="inbox" size={14} color="#8E92BC" />
+                <Text style={styles.detailText}>{item.cartons || 0} cartons</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.cardActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('StockUpdate', { productId: item.id, productName: item.name })}
+          {/* Action Button */}
+          <TouchableOpacity 
+            style={styles.updateButton}
+            onPress={() => navigation.navigate('StockUpdate', { productId: item.id, productName: item.name })}
+          >
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              style={styles.updateButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             >
-              <LinearGradient
-                colors={['#667eea', '#764ba2']}
-                style={styles.actionButtonGradient}
-              >
-                <Icon name="edit" size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Update</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+              <Icon name="edit" size={14} color="#fff" />
+              <Text style={styles.updateButtonText}>Update</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        
+        {/* Professional Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Products in {groupName}</Text>
-          <Text style={styles.headerSubtitle}>{products.length} items</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#2E3A59" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>{groupName}</Text>
+            <Text style={styles.headerSubtitle}>{products.length} products</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
+        {/* Content */}
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#fff" />
+              <ActivityIndicator size="large" color="#4F46E5" />
               <Text style={styles.loadingText}>Loading products...</Text>
             </View>
           ) : products.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
-                style={styles.emptyCard}
-              >
-                <Icon name="inventory" size={64} color="#666" />
-                <Text style={styles.emptyText}>No Products Found</Text>
-                <Text style={styles.emptySubtext}>Add your first product to get started</Text>
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconContainer}>
+                  <Icon name="inventory" size={48} color="#8E92BC" />
+                </View>
+                <Text style={styles.emptyTitle}>No Products Found</Text>
+                <Text style={styles.emptyDescription}>
+                  Add your first product to get started with inventory management
+                </Text>
                 <TouchableOpacity 
                   style={styles.addFirstButton}
                   onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
                 >
-                  <Icon name="add" size={20} color="#fff" />
-                  <Text style={styles.addFirstButtonText}>Add Product</Text>
+                  <LinearGradient
+                    colors={['#4F46E5', '#7C3AED']}
+                    style={styles.addFirstButtonGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Icon name="add" size={18} color="#fff" />
+                    <Text style={styles.addFirstButtonText}>Add Product</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-              </LinearGradient>
+              </View>
             </View>
           ) : (
             <FlatList
               data={products}
               renderItem={renderItem}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.list}
+              contentContainerStyle={styles.productsList}
               showsVerticalScrollIndicator={false}
             />
           )}
 
+          {/* Floating Action Button */}
           <TouchableOpacity 
-            style={styles.fabButton}
+            style={styles.fab}
             onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
-            activeOpacity={0.8}
+            activeOpacity={0.9}
           >
             <LinearGradient
-              colors={['#ff9a9e', '#fecfef']}
+              colors={['#4F46E5', '#7C3AED']}
               style={styles.fabGradient}
             >
-              <Icon name="add" size={28} color="#fff" />
+              <Icon name="add" size={24} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   safeArea: {
     flex: 1,
   },
   header: {
-    padding: 20,
-    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  headerContent: {
+    flex: 1,
+    marginLeft: 16,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2E3A59',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
+    color: '#8E92BC',
+    marginTop: 2,
+  },
+  headerSpacer: {
+    width: 40,
   },
   content: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    marginTop: 16,
+    fontSize: 14,
+    color: '#8E92BC',
   },
-  list: {
-    padding: 15,
+  productsList: {
+    padding: 16,
     paddingBottom: 100,
   },
-  card: {
-    marginBottom: 15,
+  productCard: {
+    backgroundColor: '#fff',
     borderRadius: 16,
+    marginBottom: 12,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  cardContent: {
-    padding: 20,
+  productCardContent: {
+    padding: 16,
   },
-  cardHeader: {
+  productHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   productImageContainer: {
-    width: 60,
-    height: 60,
+    width: 48,
+    height: 48,
     borderRadius: 12,
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   productImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   productIconContainer: {
     justifyContent: 'center',
@@ -255,118 +281,133 @@ const styles = StyleSheet.create({
   stockBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.05)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   stockBadgeText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginLeft: 4,
   },
   productInfo: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   productName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 5,
-  },
-  productMrp: {
     fontSize: 16,
-    color: '#e74c3c',
     fontWeight: '600',
-    marginBottom: 10,
+    color: '#2E3A59',
+    marginBottom: 4,
   },
-  stockDetails: {
+  productPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 12,
+  },
+  productDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  stockItem: {
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  stockText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 5,
+  detailText: {
+    fontSize: 12,
+    color: '#8E92BC',
+    marginLeft: 4,
   },
-  cardActions: {
-    alignItems: 'flex-end',
-  },
-  actionButton: {
-    borderRadius: 20,
+  updateButton: {
+    alignSelf: 'flex-end',
+    borderRadius: 12,
     overflow: 'hidden',
   },
-  actionButtonGradient: {
+  updateButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
-  actionButtonText: {
+  updateButtonText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
   },
   emptyCard: {
-    padding: 40,
+    backgroundColor: '#fff',
     borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
-    width: '90%',
+    width: '100%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: '#8E92BC',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
   addFirstButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  addFirstButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#667eea',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 25,
   },
   addFirstButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
     marginLeft: 8,
   },
-  fabButton: {
+  fab: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    elevation: 8,
-    shadowColor: '#000',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   fabGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },

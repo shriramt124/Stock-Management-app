@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, ImageBackground, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -12,8 +12,11 @@ const { width } = Dimensions.get('window');
 const HomeScreen = ({ navigation }) => {
   const [productGroups, setProductGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    const currentUser = auth().currentUser;
+    setUser(currentUser);
     fetchProductGroups();
   }, []);
 
@@ -39,12 +42,12 @@ const HomeScreen = ({ navigation }) => {
 
   const handleLogout = async () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Logout',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -68,45 +71,84 @@ const HomeScreen = ({ navigation }) => {
     return 'category';
   };
 
+  const getGroupColor = (index) => {
+    const colors = [
+      ['#4F46E5', '#7C3AED'],
+      ['#059669', '#10B981'],
+      ['#DC2626', '#EF4444'],
+      ['#D97706', '#F59E0B'],
+      ['#7C2D12', '#EA580C'],
+      ['#1E40AF', '#3B82F6'],
+    ];
+    return colors[index % colors.length];
+  };
+
   const renderItem = ({ item, index }) => (
     <TouchableOpacity 
-      style={[styles.card, { marginLeft: index % 2 === 0 ? 0 : 10 }]}
+      style={styles.categoryCard}
       onPress={() => navigation.navigate('ProductList', { groupId: item.id, groupName: item.name })}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
     >
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={styles.cardGradient}
+        colors={getGroupColor(index)}
+        style={styles.categoryCardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={styles.cardIconContainer}>
-          <Icon name={getGroupIcon(item.name)} size={32} color="#fff" />
+        <View style={styles.categoryIconContainer}>
+          <Icon name={getGroupIcon(item.name)} size={28} color="#fff" />
         </View>
-        <Text style={styles.cardTitle}>{item.name}</Text>
-        <Text style={styles.cardSubtitle} numberOfLines={2}>
-          {item.description || 'Product group'}
+        <Text style={styles.categoryTitle} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.categoryDescription} numberOfLines={2}>
+          {item.description || 'Product category'}
         </Text>
-        <View style={styles.cardArrow}>
-          <Icon name="arrow-forward" size={20} color="#fff" />
+        <View style={styles.categoryArrow}>
+          <Icon name="arrow-forward" size={16} color="rgba(255,255,255,0.8)" />
         </View>
       </LinearGradient>
     </TouchableOpacity>
   );
 
   return (
-    <LinearGradient colors={['#f093fb', '#f5576c']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        {/* Professional Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Icon name="inventory-2" size={28} color="#fff" />
-            <Text style={styles.headerTitle}>Stock Manager</Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerLeft}>
+              <View style={styles.logoContainer}>
+                <Icon name="inventory-2" size={24} color="#4F46E5" />
+              </View>
+              <View style={styles.headerText}>
+                <Text style={styles.appName}>Stock Manager</Text>
+                <Text style={styles.welcomeText}>Welcome, {user?.email?.split('@')[0] || 'User'}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Icon name="logout" size={20} color="#8E92BC" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Icon name="power-settings-new" size={24} color="#fff" />
-          </TouchableOpacity>
         </View>
 
+        {/* Stats Cards */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statsCard}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              style={styles.statsCardGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Icon name="category" size={24} color="#fff" />
+              <View style={styles.statsContent}>
+                <Text style={styles.statsNumber}>{productGroups.length}</Text>
+                <Text style={styles.statsLabel}>Categories</Text>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Main Content */}
         <View style={styles.content}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Product Categories</Text>
@@ -115,21 +157,29 @@ const HomeScreen = ({ navigation }) => {
 
           {productGroups.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)']}
-                style={styles.emptyCard}
-              >
-                <Icon name="inventory" size={64} color="#666" />
-                <Text style={styles.emptyText}>No Categories Found</Text>
-                <Text style={styles.emptySubtext}>Start by creating your first product category</Text>
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconContainer}>
+                  <Icon name="inventory" size={48} color="#8E92BC" />
+                </View>
+                <Text style={styles.emptyTitle}>No Categories Yet</Text>
+                <Text style={styles.emptyDescription}>
+                  Start by creating your first product category to organize your inventory
+                </Text>
                 <TouchableOpacity 
-                  style={styles.createFirstButton}
+                  style={styles.createButton}
                   onPress={() => navigation.navigate('ProductGroup')}
                 >
-                  <Icon name="add" size={20} color="#fff" />
-                  <Text style={styles.createFirstButtonText}>Create Category</Text>
+                  <LinearGradient
+                    colors={['#4F46E5', '#7C3AED']}
+                    style={styles.createButtonGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Icon name="add" size={18} color="#fff" />
+                    <Text style={styles.createButtonText}>Create Category</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-              </LinearGradient>
+              </View>
             </View>
           ) : (
             <FlatList
@@ -137,176 +187,246 @@ const HomeScreen = ({ navigation }) => {
               renderItem={renderItem}
               keyExtractor={(item) => item.id}
               numColumns={2}
-              contentContainerStyle={styles.list}
+              contentContainerStyle={styles.categoriesGrid}
               showsVerticalScrollIndicator={false}
-              columnWrapperStyle={styles.row}
+              columnWrapperStyle={styles.categoriesRow}
             />
           )}
 
+          {/* Floating Action Button */}
           <TouchableOpacity 
-            style={styles.fabButton}
+            style={styles.fab}
             onPress={() => navigation.navigate('ProductGroup')}
-            activeOpacity={0.8}
+            activeOpacity={0.9}
           >
             <LinearGradient
-              colors={['#ff9a9e', '#fecfef']}
+              colors={['#4F46E5', '#7C3AED']}
               style={styles.fabGradient}
             >
-              <Icon name="add" size={28} color="#fff" />
+              <Icon name="add" size={24} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   safeArea: {
     flex: 1,
   },
   header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    backdropFilter: 'blur(10px)',
+    paddingTop: 16,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginLeft: 10,
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  appName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2E3A59',
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#8E92BC',
+    marginTop: 2,
   },
   logoutButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  statsContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  statsCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsCardGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  statsContent: {
+    marginLeft: 16,
+  },
+  statsNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  statsLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
   sectionHeader: {
-    marginBottom: 25,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2E3A59',
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    marginTop: 5,
+    color: '#8E92BC',
+    marginTop: 4,
   },
-  list: {
+  categoriesGrid: {
     paddingBottom: 100,
   },
-  row: {
+  categoriesRow: {
     justifyContent: 'space-between',
   },
-  card: {
+  categoryCard: {
     width: (width - 50) / 2,
-    marginBottom: 15,
+    marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 8,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  cardGradient: {
+  categoryCardGradient: {
     padding: 20,
     height: 140,
     justifyContent: 'space-between',
   },
-  cardIconContainer: {
+  categoryIconContainer: {
     alignSelf: 'flex-start',
   },
-  cardTitle: {
+  categoryTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#fff',
-    marginTop: 10,
+    marginTop: 8,
   },
-  cardSubtitle: {
+  categoryDescription: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
+    marginTop: 4,
   },
-  cardArrow: {
+  categoryArrow: {
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 15,
-    padding: 5,
+    marginTop: 8,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   emptyCard: {
-    padding: 40,
+    backgroundColor: '#fff',
     borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
-    width: '90%',
+    width: '100%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  createFirstButton: {
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: '#8E92BC',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  createButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  createButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#667eea',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 25,
   },
-  createFirstButtonText: {
+  createButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
     marginLeft: 8,
   },
-  fabButton: {
+  fab: {
     position: 'absolute',
     bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    elevation: 8,
-    shadowColor: '#000',
+    right: 0,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   fabGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
