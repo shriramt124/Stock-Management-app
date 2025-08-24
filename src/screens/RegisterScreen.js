@@ -32,19 +32,19 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     setLoading(true);
-    
+
     try {
       // Create user with email and password
       const userCredential = await auth().createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
-      
+
       // Add user details to Firestore
       await firestore().collection('users').doc(user.uid).set({
         name,
         email,
         createdAt: new Date().toISOString(),
       });
-      
+
       Alert.alert('Success', 'Account created successfully', [
         {
           text: 'OK',
@@ -60,24 +60,24 @@ const RegisterScreen = ({ navigation }) => {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    
+
     try {
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      
+
       // Get the users ID token
       const { idToken } = await GoogleSignin.signIn();
-      
+
       // Create a Google credential with the token
       const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-      
+
       // Sign-in the user with the credential
       const userCredential = await auth().signInWithCredential(googleCredential);
       const user = userCredential.user;
-      
+
       // Check if user document exists, if not create one
       const userDoc = await firestore().collection('users').doc(user.uid).get();
-      
+
       if (!userDoc.exists) {
         await firestore().collection('users').doc(user.uid).set({
           name: user.displayName || '',
@@ -87,7 +87,7 @@ const RegisterScreen = ({ navigation }) => {
           createdAt: new Date().toISOString(),
         });
       }
-      
+
       Alert.alert('Success', 'Account created successfully', [
         {
           text: 'OK',
@@ -114,7 +114,7 @@ const RegisterScreen = ({ navigation }) => {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Register to manage your stock</Text>
-        
+
         <TextInput
           style={styles.input}
           placeholder="Full Name"
@@ -122,7 +122,7 @@ const RegisterScreen = ({ navigation }) => {
           value={name}
           onChangeText={setName}
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -132,7 +132,7 @@ const RegisterScreen = ({ navigation }) => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -141,7 +141,7 @@ const RegisterScreen = ({ navigation }) => {
           onChangeText={setPassword}
           secureTextEntry
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Confirm Password"
@@ -150,7 +150,7 @@ const RegisterScreen = ({ navigation }) => {
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
-        
+
         <TouchableOpacity 
           style={styles.button}
           onPress={handleRegister}
@@ -183,7 +183,7 @@ const RegisterScreen = ({ navigation }) => {
             </>
           )}
         </TouchableOpacity>
-        
+
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>Already have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>

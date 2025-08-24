@@ -1,6 +1,7 @@
 import firebase from '@react-native-firebase/app';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,7 +20,15 @@ if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
+// Configure Google Sign-In - Add your actual web client ID from Firebase Console
+GoogleSignin.configure({
+  webClientId: '1045053520507-your-actual-web-client-id.apps.googleusercontent.com', // Replace with your actual web client ID from Firebase Console > Authentication > Sign-in method > Google
+  offlineAccess: true,
+  hostedDomain: '',
+  forceCodeForRefreshToken: true,
+});
+
 // Get Firebase instances
 const db = firestore();
 
-export { firebase, auth, db };
+export { firebase, auth, db, GoogleSignin };

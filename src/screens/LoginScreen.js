@@ -25,7 +25,7 @@ const LoginScreen = ({ navigation }) => {
     }
 
     setLoading(true);
-    
+
     try {
       await auth().signInWithEmailAndPassword(email, password);
       navigation.replace('Home');
@@ -38,24 +38,24 @@ const LoginScreen = ({ navigation }) => {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    
+
     try {
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      
+
       // Get the users ID token
       const { idToken } = await GoogleSignin.signIn();
-      
+
       // Create a Google credential with the token
       const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-      
+
       // Sign-in the user with the credential
       const userCredential = await auth().signInWithCredential(googleCredential);
       const user = userCredential.user;
-      
+
       // Check if user document exists, if not create one
       const userDoc = await firestore().collection('users').doc(user.uid).get();
-      
+
       if (!userDoc.exists) {
         await firestore().collection('users').doc(user.uid).set({
           name: user.displayName || '',
@@ -65,7 +65,7 @@ const LoginScreen = ({ navigation }) => {
           createdAt: new Date().toISOString(),
         });
       }
-      
+
       navigation.replace('Home');
     } catch (error) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -87,7 +87,7 @@ const LoginScreen = ({ navigation }) => {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Stock Management</Text>
         <Text style={styles.subtitle}>Login to your account</Text>
-        
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -97,7 +97,7 @@ const LoginScreen = ({ navigation }) => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -106,8 +106,8 @@ const LoginScreen = ({ navigation }) => {
           onChangeText={setPassword}
           secureTextEntry
         />
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.button}
           onPress={handleLogin}
           disabled={loading}
@@ -125,7 +125,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.dividerLine} />
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.googleButton}
           onPress={handleGoogleSignIn}
           disabled={googleLoading}
@@ -139,7 +139,7 @@ const LoginScreen = ({ navigation }) => {
             </>
           )}
         </TouchableOpacity>
-        
+
         <View style={styles.registerContainer}>
           <Text style={styles.registerText}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
