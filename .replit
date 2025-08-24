@@ -6,3 +6,15 @@ channel = "stable-25_05"
 
 [deployment]
 run = ["sh", "-c", "npm run start"]
+
+[workflows]
+runButton = "Start React Native"
+
+[[workflows.workflow]]
+name = "Start React Native"
+author = 46656253
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx react-native start --reset-cache"
