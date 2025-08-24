@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "666062081284",
+    "project_id": "stock-maintenance-app",
+    "storage_bucket": "stock-maintenance-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:666062081284:android:b0b2531db9df8831729451",
+        "android_client_info": {
+          "package_name": "com.ytreactnative"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBusFRsBvjgNxXORmYTdkjPUST8rZcxGCg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
