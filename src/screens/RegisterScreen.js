@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const RegisterScreen = ({ navigation }) => {
@@ -15,8 +16,10 @@ const RegisterScreen = ({ navigation }) => {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
+    // Configure Google Sign-In
     GoogleSignin.configure({
-      webClientId: '666062081284-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // From Firebase Console
+      webClientId: '666062081284-gra8sgmg1em9uuletstafh2hr4snlshv.apps.googleusercontent.com',
+      offlineAccess: true,
     });
   }, []);
 
@@ -31,26 +34,31 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
 
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password should be at least 6 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Create user with email and password
       const userCredential = await auth().createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
 
-      // Add user details to Firestore
+      // Update profile with name
+      await user.updateProfile({
+        displayName: name,
+      });
+
+      // Create user document in Firestore
       await firestore().collection('users').doc(user.uid).set({
-        name,
-        email,
+        name: name,
+        email: email,
+        provider: 'email',
         createdAt: new Date().toISOString(),
       });
 
-      Alert.alert('Success', 'Account created successfully', [
-        {
-          text: 'OK',
-          onPress: () => navigation.replace('Home'),
-        },
-      ]);
+      navigation.replace('Home');
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
@@ -88,12 +96,7 @@ const RegisterScreen = ({ navigation }) => {
         });
       }
 
-      Alert.alert('Success', 'Account created successfully', [
-        {
-          text: 'OK',
-          onPress: () => navigation.replace('Home'),
-        },
-      ]);
+      navigation.replace('Home');
     } catch (error) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         Alert.alert('Info', 'Sign in was cancelled');
@@ -103,6 +106,7 @@ const RegisterScreen = ({ navigation }) => {
         Alert.alert('Error', 'Play services not available');
       } else {
         Alert.alert('Error', error.message);
+        console.log('Google Sign-In Error:', error);
       }
     } finally {
       setGoogleLoading(false);
@@ -112,8 +116,8 @@ const RegisterScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.formContainer}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Register to manage your stock</Text>
+        <Text style={styles.title}>Stock Management</Text>
+        <Text style={styles.subtitle}>Create your account</Text>
 
         <TextInput
           style={styles.input}
@@ -151,7 +155,7 @@ const RegisterScreen = ({ navigation }) => {
           secureTextEntry
         />
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button}
           onPress={handleRegister}
           disabled={loading}
@@ -169,7 +173,7 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.dividerLine} />
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.googleButton}
           onPress={handleGoogleSignIn}
           disabled={googleLoading}

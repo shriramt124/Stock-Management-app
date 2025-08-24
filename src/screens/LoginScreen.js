@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,8 +14,10 @@ const LoginScreen = ({ navigation }) => {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
+    // Configure Google Sign-In
     GoogleSignin.configure({
-      webClientId: '666062081284-gra8sgmg1em9uuletstafh2hr4snlshv.apps.googleusercontent.com', // From Firebase Console
+      webClientId: '666062081284-gra8sgmg1em9uuletstafh2hr4snlshv.apps.googleusercontent.com',
+      offlineAccess: true,
     });
   }, []);
 
@@ -76,6 +79,7 @@ const LoginScreen = ({ navigation }) => {
         Alert.alert('Error', 'Play services not available');
       } else {
         Alert.alert('Error', error.message);
+        console.log('Google Sign-In Error:', error);
       }
     } finally {
       setGoogleLoading(false);
