@@ -14,7 +14,7 @@ const LoginScreen = ({ navigation }) => {
 
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: '666062081284-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // From Firebase Console
+      webClientId: '666062081284-gra8sgmg1em9uuletstafh2hr4snlshv.apps.googleusercontent.com', // From Firebase Console
     });
   }, []);
 
