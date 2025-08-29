@@ -50,7 +50,7 @@ react {
     //   The hermes compiler command to run. By default it is 'hermesc'
     // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
     //
-    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
+    //   The list of flags to pass to the Hermes compiler. Default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
 
     /* Autolinking */
@@ -84,6 +84,7 @@ android {
     defaultConfig {
         applicationId "com.ytreactnative"
         minSdkVersion rootProject.ext.minSdkVersion
+        compileSdkVersion rootProject.ext.compileSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
@@ -107,8 +108,10 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
-            buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
-            buildConfigField "boolean", "IS_HERMES_ENABLED", (findProperty("newArchEnabled") ?: false).toString()
+            // buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+            // buildConfigField "boolean", "IS_HERMES_ENABLED", (findProperty("newArchEnabled") ?: false).toString()
+            buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", "false"
+            buildConfigField "boolean", "IS_HERMES_ENABLED", "true"
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
@@ -116,8 +119,10 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
-            buildConfigField "boolean", "IS_HERMES_ENABLED", (findProperty("newArchEnabled") ?: false).toString()
+            // buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+            // buildConfigField "boolean", "IS_HERMES_ENABLED", (findProperty("newArchEnabled") ?: false).toString()
+            buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", "false"
+            buildConfigField "boolean", "IS_HERMES_ENABLED", "true"
         }
     }
 }
