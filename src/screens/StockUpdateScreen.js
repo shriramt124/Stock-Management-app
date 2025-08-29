@@ -1,10 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { useAuth } from '../context/AuthContext';
 
 const StockUpdateScreen = ({ route, navigation }) => {
   const { productId, productName } = route.params;
@@ -14,10 +14,18 @@ const StockUpdateScreen = ({ route, navigation }) => {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const { canModifyStock } = useAuth();
 
   useEffect(() => {
     fetchProduct();
-  }, [productId]);
+    if (!canModifyStock()) {
+      Alert.alert(
+        'Access Denied',
+        'Only administrators can modify stock levels.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, []);
 
   const fetchProduct = async () => {
     try {
@@ -37,14 +45,19 @@ const StockUpdateScreen = ({ route, navigation }) => {
   };
 
   const handleStockUpdate = async () => {
+    if (!canModifyStock()) {
+      Alert.alert('Permission Denied', 'You do not have permission to update stock.');
+      return;
+    }
+
     if (!quantity || isNaN(parseInt(quantity))) {
       Alert.alert('Validation Error', 'Please enter a valid quantity');
       return;
     }
 
     const updateQuantity = parseInt(quantity);
-    const newStock = operation === 'add' 
-      ? product.stock + updateQuantity 
+    const newStock = operation === 'add'
+      ? product.stock + updateQuantity
       : product.stock - updateQuantity;
 
     if (newStock < 0) {
@@ -105,7 +118,7 @@ const StockUpdateScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        
+
         {/* Professional Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -120,7 +133,7 @@ const StockUpdateScreen = ({ route, navigation }) => {
 
         <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-            
+
             {/* Current Stock Card */}
             <View style={styles.currentStockCard}>
               <LinearGradient
@@ -145,17 +158,17 @@ const StockUpdateScreen = ({ route, navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Operation Type</Text>
               <View style={styles.operationButtons}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
                     styles.operationButton,
                     operation === 'add' && styles.operationButtonSelected
                   ]}
                   onPress={() => setOperation('add')}
                 >
-                  <Icon 
-                    name="add-circle" 
-                    size={24} 
-                    color={operation === 'add' ? '#fff' : '#10B981'} 
+                  <Icon
+                    name="add-circle"
+                    size={24}
+                    color={operation === 'add' ? '#fff' : '#10B981'}
                   />
                   <Text style={[
                     styles.operationButtonText,
@@ -165,17 +178,17 @@ const StockUpdateScreen = ({ route, navigation }) => {
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
                     styles.operationButton,
                     operation === 'subtract' && styles.operationButtonSelected
                   ]}
                   onPress={() => setOperation('subtract')}
                 >
-                  <Icon 
-                    name="remove-circle" 
-                    size={24} 
-                    color={operation === 'subtract' ? '#fff' : '#EF4444'} 
+                  <Icon
+                    name="remove-circle"
+                    size={24}
+                    color={operation === 'subtract' ? '#fff' : '#EF4444'}
                   />
                   <Text style={[
                     styles.operationButtonText,
@@ -247,8 +260,8 @@ const StockUpdateScreen = ({ route, navigation }) => {
                   <View style={[styles.previewRow, styles.previewRowFinal]}>
                     <Text style={styles.previewLabelFinal}>New Stock:</Text>
                     <Text style={styles.previewValueFinal}>
-                      {operation === 'add' 
-                        ? product?.stock + parseInt(quantity) 
+                      {operation === 'add'
+                        ? product?.stock + parseInt(quantity)
                         : product?.stock - parseInt(quantity)
                       } {product?.unit}
                     </Text>
@@ -258,10 +271,10 @@ const StockUpdateScreen = ({ route, navigation }) => {
             )}
 
             {/* Update Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.updateButton, updating && styles.updateButtonDisabled]}
               onPress={handleStockUpdate}
-              disabled={updating}
+              disabled={updating || !canModifyStock()}
               activeOpacity={0.8}
             >
               <LinearGradient

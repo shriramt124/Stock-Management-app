@@ -20,23 +20,31 @@ export const AuthProvider = ({ children }) => {
           // Get additional user data from Firestore
           const userDoc = await db.collection('users').doc(user.uid).get();
           if (userDoc.exists()) {
+            const userData = userDoc.data();
+            
+            // Check if user account is active
+            if (!userData.isActive) {
+              await auth().signOut();
+              setCurrentUser(null);
+              setLoading(false);
+              return;
+            }
+
             setCurrentUser({
               uid: user.uid,
               email: user.email,
-              ...userDoc.data(),
+              role: userData.role || 'user',
+              ...userData,
             });
           } else {
-            setCurrentUser({
-              uid: user.uid,
-              email: user.email,
-            });
+            // If no user document exists, sign out
+            await auth().signOut();
+            setCurrentUser(null);
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
-          setCurrentUser({
-            uid: user.uid,
-            email: user.email,
-          });
+          await auth().signOut();
+          setCurrentUser(null);
         }
       } else {
         // User is signed out
@@ -49,9 +57,24 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  const isAdmin = () => {
+    return currentUser && currentUser.role === 'admin';
+  };
+
+  const isUser = () => {
+    return currentUser && currentUser.role === 'user';
+  };
+
+  const canModifyStock = () => {
+    return isAdmin();
+  };
+
   const value = {
     currentUser,
     loading,
+    isAdmin,
+    isUser,
+    canModifyStock,
   };
 
   return (

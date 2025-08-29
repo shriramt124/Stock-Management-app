@@ -1,23 +1,29 @@
-
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { subscribeToProducts } from '../services/firebaseService';
+import { useAuth } from '../context/AuthContext';
 
 const ProductListScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const canModifyStock = () => {
+    // Assuming user object has a 'role' property, 'admin' or 'user'
+    return user && user.role === 'admin';
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToProducts(groupId, (productList) => {
       setProducts(productList);
       setLoading(false);
     });
-    
+
     return () => unsubscribe();
   }, [groupId]);
 
@@ -46,7 +52,7 @@ const ProductListScreen = ({ route, navigation }) => {
         activeOpacity={0.9}
       >
         <View style={styles.productCardContent}>
-          
+
           {/* Product Image and Status */}
           <View style={styles.productHeader}>
             <View style={styles.productImageContainer}>
@@ -60,7 +66,7 @@ const ProductListScreen = ({ route, navigation }) => {
                 </View>
               )}
             </View>
-            
+
             <View style={[styles.stockBadge, { backgroundColor: stockStatus.bgColor }]}>
               <Icon name={stockStatus.icon} size={12} color={stockStatus.color} />
               <Text style={[styles.stockBadgeText, { color: stockStatus.color }]}>
@@ -73,7 +79,7 @@ const ProductListScreen = ({ route, navigation }) => {
           <View style={styles.productInfo}>
             <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
             <Text style={styles.productPrice}>₹{item.mrp.toLocaleString()}</Text>
-            
+
             <View style={styles.productDetails}>
               <View style={styles.detailItem}>
                 <Icon name="inventory-2" size={14} color="#8E92BC" />
@@ -87,20 +93,22 @@ const ProductListScreen = ({ route, navigation }) => {
           </View>
 
           {/* Action Button */}
-          <TouchableOpacity 
-            style={styles.updateButton}
-            onPress={() => navigation.navigate('StockUpdate', { productId: item.id, productName: item.name })}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              style={styles.updateButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+          {canModifyStock() && (
+            <TouchableOpacity 
+              style={styles.updateButton}
+              onPress={() => navigation.navigate('StockUpdate', { productId: item.id, productName: item.name })}
             >
-              <Icon name="edit" size={14} color="#fff" />
-              <Text style={styles.updateButtonText}>Update</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#4F46E5', '#7C3AED']}
+                style={styles.updateButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Icon name="edit" size={14} color="#fff" />
+                <Text style={styles.updateButtonText}>Update</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -109,7 +117,7 @@ const ProductListScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        
+
         {/* Professional Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -120,6 +128,15 @@ const ProductListScreen = ({ route, navigation }) => {
             <Text style={styles.headerSubtitle}>{products.length} products</Text>
           </View>
           <View style={styles.headerSpacer} />
+          {/* Conditionally show add product button for admins only */}
+          {canModifyStock() && (
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
+            >
+              <Icon name="add" size={24} color="#4a80f5" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Content */}
@@ -139,20 +156,22 @@ const ProductListScreen = ({ route, navigation }) => {
                 <Text style={styles.emptyDescription}>
                   Add your first product to get started with inventory management
                 </Text>
-                <TouchableOpacity 
-                  style={styles.addFirstButton}
-                  onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
-                >
-                  <LinearGradient
-                    colors={['#4F46E5', '#7C3AED']}
-                    style={styles.addFirstButtonGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
+                {canModifyStock() && (
+                  <TouchableOpacity 
+                    style={styles.addFirstButton}
+                    onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
                   >
-                    <Icon name="add" size={18} color="#fff" />
-                    <Text style={styles.addFirstButtonText}>Add Product</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <LinearGradient
+                      colors={['#4F46E5', '#7C3AED']}
+                      style={styles.addFirstButtonGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Icon name="add" size={18} color="#fff" />
+                      <Text style={styles.addFirstButtonText}>Add Product</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ) : (
@@ -166,18 +185,20 @@ const ProductListScreen = ({ route, navigation }) => {
           )}
 
           {/* Floating Action Button */}
-          <TouchableOpacity 
-            style={styles.fab}
-            onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              style={styles.fabGradient}
+          {canModifyStock() && (
+            <TouchableOpacity 
+              style={styles.fab}
+              onPress={() => navigation.navigate('AddProduct', { groupId, groupName })}
+              activeOpacity={0.9}
             >
-              <Icon name="add" size={24} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#4F46E5', '#7C3AED']}
+                style={styles.fabGradient}
+              >
+                <Icon name="add" size={24} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -222,6 +243,9 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  addButton: {
+    padding: 8,
   },
   content: {
     flex: 1,

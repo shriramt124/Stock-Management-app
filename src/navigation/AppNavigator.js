@@ -12,6 +12,7 @@ import ProductDetailScreen from '../screens/ProductDetailScreen';
 import AddProductScreen from '../screens/AddProductScreen';
 import StockUpdateScreen from '../screens/StockUpdateScreen';
 import StockHistoryScreen from '../screens/StockHistoryScreen';
+import UserManagementScreen from '../screens/UserManagementScreen'; // Import UserManagementScreen
 
 const Stack = createNativeStackNavigator();
 
@@ -63,6 +64,11 @@ const AppNavigator = () => {
           name="StockHistory" 
           component={StockHistoryScreen} 
           options={{ headerShown: true, title: 'Stock History' }}
+        />
+        <Stack.Screen 
+          name="UserManagement" 
+          component={UserManagementScreen} 
+          options={{ headerShown: true, title: 'User Management' }} // Add UserManagement screen
         />
       </Stack.Navigator>
     </NavigationContainer>

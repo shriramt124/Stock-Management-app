@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
@@ -12,13 +11,43 @@ const { width } = Dimensions.get('window');
 const HomeScreen = ({ navigation }) => {
   const [productGroups, setProductGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  const fetchUserData = useCallback(async (user) => {
+    if (!user) return;
+    try {
+      const userDoc = await firestore().collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        const userData = { id: user.uid, ...userDoc.data() };
+        setCurrentUserData(userData);
+        setIsAdminUser(userData.role === 'admin');
+      } else {
+        // Handle case where user document doesn't exist yet (e.g., first login)
+        // You might want to create a default user document here or prompt for role
+        console.warn(`User document not found for UID: ${user.uid}`);
+        setIsAdminUser(false); // Default to false if no role is found
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      Alert.alert('Error', 'Failed to load user profile.');
+    }
+  }, []);
 
   useEffect(() => {
-    const currentUser = auth().currentUser;
-    setUser(currentUser);
-    fetchProductGroups();
-  }, []);
+    const unsubscribe = auth().onAuthStateChanged((user) => {
+      if (user) {
+        fetchUserData(user);
+        fetchProductGroups();
+      } else {
+        setUser(null);
+        setProductGroups([]);
+        navigation.replace('Login');
+      }
+    });
+
+    return () => unsubscribe(); // Cleanup subscription on unmount
+  }, [fetchUserData, navigation]);
 
   const fetchProductGroups = async () => {
     setLoading(true);
@@ -83,8 +112,19 @@ const HomeScreen = ({ navigation }) => {
     return colors[index % colors.length];
   };
 
+  const menuItems = [
+    { id: '1', title: 'Product Categories', subtitle: 'View all categories', icon: 'category', color: '#4F46E5', onPress: () => navigation.navigate('ProductList', { screen: 'ProductListScreen' }) },
+    ...(isAdminUser ? [
+      { id: '2', title: 'Manage Users', subtitle: 'Add, edit, or remove users', icon: 'people', color: '#10B981', onPress: () => navigation.navigate('UserManagement') },
+      { id: '3', title: 'Add Product', subtitle: 'Add new products to inventory', icon: 'add-shopping-cart', color: '#F59E0B', onPress: () => navigation.navigate('ProductForm', { mode: 'add' }) },
+    ] : []),
+    { id: '4', title: 'Order History', subtitle: 'View your past orders', icon: 'history', color: '#EF4444', onPress: () => navigation.navigate('OrderHistory') }
+  ];
+
+  const isAdmin = () => isAdminUser;
+
   const renderItem = ({ item, index }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.categoryCard}
       onPress={() => navigation.navigate('ProductList', { groupId: item.id, groupName: item.name })}
       activeOpacity={0.9}
@@ -121,7 +161,7 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.headerText}>
                 <Text style={styles.appName}>Stock Manager</Text>
-                <Text style={styles.welcomeText}>Welcome, {user?.email?.split('@')[0] || 'User'}</Text>
+                <Text style={styles.welcomeText}>Welcome, {currentUserData?.name || currentUserData?.email?.split('@')[0] || 'User'}</Text>
               </View>
             </View>
             <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
@@ -165,20 +205,22 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.emptyDescription}>
                   Start by creating your first product category to organize your inventory
                 </Text>
-                <TouchableOpacity 
-                  style={styles.createButton}
-                  onPress={() => navigation.navigate('ProductGroup')}
-                >
-                  <LinearGradient
-                    colors={['#4F46E5', '#7C3AED']}
-                    style={styles.createButtonGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
+                {isAdminUser && (
+                  <TouchableOpacity
+                    style={styles.createButton}
+                    onPress={() => navigation.navigate('ProductGroup')}
                   >
-                    <Icon name="add" size={18} color="#fff" />
-                    <Text style={styles.createButtonText}>Create Category</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <LinearGradient
+                      colors={['#4F46E5', '#7C3AED']}
+                      style={styles.createButtonGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Icon name="add" size={18} color="#fff" />
+                      <Text style={styles.createButtonText}>Create Category</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ) : (
@@ -194,18 +236,20 @@ const HomeScreen = ({ navigation }) => {
           )}
 
           {/* Floating Action Button */}
-          <TouchableOpacity 
-            style={styles.fab}
-            onPress={() => navigation.navigate('ProductGroup')}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              style={styles.fabGradient}
+          {isAdminUser && (
+            <TouchableOpacity
+              style={styles.fab}
+              onPress={() => navigation.navigate('ProductGroup')}
+              activeOpacity={0.9}
             >
-              <Icon name="add" size={24} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#4F46E5', '#7C3AED']}
+                style={styles.fabGradient}
+              >
+                <Icon name="add" size={24} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -264,6 +308,14 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     backgroundColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#8E92BC',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   statsContainer: {
     paddingHorizontal: 20,
@@ -413,7 +465,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     bottom: 20,
-    right: 0,
+    right: 0, // Adjusted to be on the right side
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -429,6 +481,78 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Styles for the new menu-based UI
+  welcomeSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  userInfo: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2E3A59',
+    marginTop: 8,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  roleTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  adminRole: {
+    backgroundColor: '#F59E0B', // Admin color
+  },
+  userRole: {
+    backgroundColor: '#4F46E5', // User color
+  },
+  menuContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  menuCard: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  menuGradient: {
+    padding: 16,
+  },
+  menuContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E3A59',
+  },
+  menuSubtitle: {
+    fontSize: 12,
+    color: '#8E92BC',
+    marginTop: 2,
   },
 });
 

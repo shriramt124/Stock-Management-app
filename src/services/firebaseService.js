@@ -254,6 +254,107 @@ export const getUserById = async (userId) => {
   }
 };
 
+// Admin User Management Services
+export const createUserByAdmin = async (userData, adminId) => {
+  try {
+    // Check if admin has permission
+    const adminDoc = await firestore().collection('users').doc(adminId).get();
+    if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+      return { success: false, error: 'Unauthorized: Only admins can create users' };
+    }
+
+    // Create user with email and password
+    const userCredential = await auth().createUserWithEmailAndPassword(userData.email, userData.password);
+    const user = userCredential.user;
+    
+    // Add user details to Firestore
+    await firestore().collection('users').doc(user.uid).set({
+      uid: user.uid,
+      email: user.email,
+      name: userData.name || '',
+      role: userData.role || 'user',
+      isActive: true,
+      createdBy: adminId,
+      createdAt: new Date().toISOString(),
+    });
+    
+    return { success: true, user };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const getAllUsers = async (adminId) => {
+  try {
+    // Check if admin has permission
+    const adminDoc = await firestore().collection('users').doc(adminId).get();
+    if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+      return { success: false, error: 'Unauthorized: Only admins can view all users' };
+    }
+
+    const querySnapshot = await firestore().collection('users').get();
+    const users = [];
+    querySnapshot.forEach((doc) => {
+      users.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+    return { success: true, users };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const toggleUserStatus = async (userId, adminId) => {
+  try {
+    // Check if admin has permission
+    const adminDoc = await firestore().collection('users').doc(adminId).get();
+    if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+      return { success: false, error: 'Unauthorized: Only admins can manage users' };
+    }
+
+    const userDoc = await firestore().collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const currentStatus = userDoc.data().isActive;
+    await firestore().collection('users').doc(userId).update({
+      isActive: !currentStatus,
+      lastUpdated: new Date().toISOString(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const checkUserAccess = async (userId) => {
+  try {
+    const userDoc = await firestore().collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const userData = userDoc.data();
+    if (!userData.isActive) {
+      return { success: false, error: 'Account is deactivated' };
+    }
+
+    return { 
+      success: true, 
+      user: {
+        id: userDoc.id,
+        ...userData,
+      }
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
 export const updateUserProfile = async (userId, userData) => {
   try {
     await firestore().collection('users').doc(userId).update({

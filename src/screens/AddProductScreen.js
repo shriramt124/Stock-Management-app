@@ -1,11 +1,12 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Image, PermissionsAndroid, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { useAuth } from '../context/AuthContext';
+
 
 const AddProductScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -17,6 +18,35 @@ const AddProductScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const { currentUser } = useAuth(); // Get current user from AuthContext
+
+  // Check if the current user is an admin (you'll need to implement a way to check this, e.g., by storing user roles in Firestore)
+  const isAdmin = currentUser && currentUser.role === 'admin'; // Assuming user object has a 'role' property
+
+  // If not an admin, don't render the product addition form
+  if (!isAdmin) {
+    // You might want to show a message or redirect to a different screen
+    // For now, we'll just return null or an empty view
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Icon name="arrow-back" size={24} color="#2E3A59" />
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Access Denied</Text>
+              <Text style={styles.headerSubtitle}>Only Admins can add products</Text>
+            </View>
+            <View style={styles.headerSpacer} />
+          </View>
+          <View style={styles.centeredMessage}>
+            <Text style={styles.messageText}>You do not have permission to add products.</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   const requestStoragePermission = async () => {
     if (Platform.OS === 'android') {
@@ -94,7 +124,7 @@ const AddProductScreen = ({ route, navigation }) => {
       };
 
       await firestore().collection('products').add(productData);
-      
+
       Alert.alert('Success', 'Product added successfully!', [
         {
           text: 'OK',
@@ -128,7 +158,7 @@ const AddProductScreen = ({ route, navigation }) => {
 
         <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-            
+
             {/* Image Selection Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Product Image</Text>
@@ -153,7 +183,7 @@ const AddProductScreen = ({ route, navigation }) => {
             {/* Product Information Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Product Information</Text>
-              
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Product Name *</Text>
                 <View style={styles.inputContainer}>
@@ -256,7 +286,7 @@ const AddProductScreen = ({ route, navigation }) => {
             </View>
 
             {/* Action Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
               onPress={handleAddProduct}
               disabled={loading}
@@ -323,6 +353,17 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  centeredMessage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  messageText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
   scrollContainer: {
     flex: 1,

@@ -3,11 +3,20 @@ import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { subscribeToProductById } from '../services/firebaseService';
+import { useAuth } from '../context/AuthContext';
 
 const ProductDetailScreen = ({ route, navigation }) => {
   const { productId } = route.params;
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth(); // Assuming useAuth provides user object with a role property
+
+  // Function to determine if the current user can modify stock
+  const canModifyStock = () => {
+    // You'll need to define how roles are stored and accessed.
+    // For example, if your user object has a 'role' field:
+    return user && user.role === 'admin';
+  };
 
   useEffect(() => {
     // Set up real-time listener for product details
@@ -18,7 +27,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         title: productData.name,
       });
     });
-    
+
     // Clean up listener on component unmount
     return () => unsubscribe();
   }, [productId, navigation]);
@@ -45,39 +54,41 @@ const ProductDetailScreen = ({ route, navigation }) => {
             <Icon name="inventory" size={24} color="#4a80f5" />
             <Text style={styles.title}>{product.name}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>MRP:</Text>
             <Text style={styles.detailValue}>₹{product.mrp}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Current Stock:</Text>
             <Text style={styles.detailValue}>{product.stock} {product.unit}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Cartons:</Text>
             <Text style={styles.detailValue}>{product.cartons || 0}</Text>
           </View>
-          
+
           {product.description && (
             <View style={styles.descriptionContainer}>
               <Text style={styles.descriptionLabel}>Description:</Text>
               <Text style={styles.descriptionText}>{product.description}</Text>
             </View>
           )}
-          
+
           <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.updateButton]}
-              onPress={() => navigation.navigate('StockUpdate', { productId: product.id, productName: product.name })}
-            >
-              <Icon name="edit" size={20} color="#fff" style={styles.actionIcon} />
-              <Text style={styles.actionText}>Update Stock</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
+            {canModifyStock() && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.updateButton]}
+                onPress={() => navigation.navigate('StockUpdate', { productId: product.id, productName: product.name })}
+              >
+                <Icon name="edit" size={20} color="#fff" style={styles.actionIcon} />
+                <Text style={styles.actionText}>Update Stock</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#4CAF50', marginLeft: 10 }]}
               onPress={() => navigation.navigate('StockHistory', { productId: product.id, productName: product.name })}
             >
