@@ -17,4 +17,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx react-native start --reset-cache"
+args = "npx react-native start --port=8081 --reset-cache"
